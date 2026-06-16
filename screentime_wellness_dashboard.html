@@ -1,0 +1,2016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screen Time vs Mental Wellness — Interactive Dashboard</title>
+<meta name="description" content="Interactive visual dashboard analyzing the relationship between screen time habits and mental wellness indicators across 400 users.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+<style>
+/* ═══════════════════════════ DESIGN TOKENS ═══════════════════════════ */
+:root {
+  --bg:            #0D1117;
+  --card-bg:       #161B22;
+  --card-border:   #21262D;
+  --accent-blue:   #58A6FF;
+  --accent-red:    #F78166;
+  --accent-green:  #56D364;
+  --accent-gold:   #E3B341;
+  --accent-purple: #D2A8FF;
+  --text-primary:  #E6EDF3;
+  --text-muted:    #8B949E;
+  --toggle-on:     #238636;
+  --toggle-off:    #30363D;
+  --tooltip-bg:    #21262D;
+  --radius:        14px;
+}
+
+/* ═══════════════════════════ RESET & BASE ═══════════════════════════ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════════════════════ CANVAS BG ═══════════════════════════ */
+#bg-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+}
+
+/* ═══════════════════════════ STICKY HEADER ═══════════════════════════ */
+#sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--card-border);
+  padding: 12px 28px;
+}
+.header-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.header-left  { display: flex; align-items: center; gap: 12px; }
+.header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.header-logo {
+  width: 38px; height: 38px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 0 16px rgba(88,166,255,0.25);
+  flex-shrink: 0;
+}
+h1.dashboard-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--accent-blue) 30%, var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  white-space: nowrap;
+}
+.header-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Badge */
+.data-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(35,134,54,0.12);
+  border: 1px solid rgba(86,211,100,0.25);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 11px; font-weight: 600;
+  color: var(--accent-green);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  white-space: nowrap;
+}
+.data-badge.visible { opacity: 1; }
+.badge-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  animation: pulse-dot 2.2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.5); opacity: 0.5; }
+}
+
+/* Header buttons */
+.hdr-btn {
+  display: flex; align-items: center; gap: 6px;
+  border: none; border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+}
+.hdr-btn-primary {
+  background: var(--accent-blue);
+  color: #0D1117;
+}
+.hdr-btn-primary:hover { background: #79B8FF; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(88,166,255,0.3); }
+.hdr-btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--card-border);
+}
+.hdr-btn-ghost:hover { border-color: var(--accent-blue); color: var(--accent-blue); transform: translateY(-1px); }
+
+/* ═══════════════════════════ UPLOAD ZONE ═══════════════════════════ */
+#upload-zone {
+  position: relative; z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 64px);
+  padding: 40px 24px;
+}
+.upload-hero {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.upload-hero h2 {
+  font-size: 32px; font-weight: 800;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple), var(--accent-green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 10px;
+}
+.upload-hero p { font-size: 15px; color: var(--text-muted); max-width: 440px; }
+
+.drop-area {
+  width: 100%; max-width: 500px;
+  border: 2px dashed var(--card-border);
+  border-radius: 20px;
+  padding: 52px 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.3s, background 0.3s, transform 0.3s;
+  background: var(--card-bg);
+  position: relative;
+}
+.drop-area:hover, .drop-area.drag-over {
+  border-color: var(--accent-blue);
+  background: rgba(88,166,255,0.05);
+  transform: scale(1.01);
+}
+.drop-icon { font-size: 52px; margin-bottom: 16px; display: block; animation: float 3s ease-in-out infinite; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+.drop-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.drop-sub   { font-size: 13px; color: var(--text-muted); margin-bottom: 22px; line-height: 1.6; }
+.drop-btn {
+  background: linear-gradient(135deg, var(--accent-blue), #3D8BFF);
+  color: #fff;
+  border: none; border-radius: 10px;
+  padding: 12px 28px;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 4px 20px rgba(88,166,255,0.3);
+}
+.drop-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(88,166,255,0.45); }
+#file-input { display: none; }
+.drop-hint  { margin-top: 14px; font-size: 11px; color: var(--text-muted); }
+
+/* Feature chips */
+.feature-chips {
+  display: flex; gap: 10px; margin-top: 28px; flex-wrap: wrap; justify-content: center;
+}
+.chip {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--card-border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 11px; color: var(--text-muted);
+}
+.chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+/* Spinner */
+.spinner {
+  display: none;
+  width: 44px; height: 44px;
+  border: 4px solid var(--card-border);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-top: 24px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════ TOAST ═══════════════════════════ */
+#toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  background: var(--accent-red);
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 13px; font-weight: 500;
+  z-index: 9999;
+  transform: translateY(80px);
+  opacity: 0;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex; align-items: center; gap: 8px;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+
+/* ═══════════════════════════ DASHBOARD ═══════════════════════════ */
+#dashboard {
+  display: none;
+  position: relative; z-index: 1;
+  padding: 24px 24px 40px;
+}
+.dash-inner { max-width: 1400px; margin: 0 auto; }
+
+/* ═══════════════════════════ FILTER BAR ═══════════════════════════ */
+.filter-bar {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-end;
+}
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Pills */
+.pill-group { display: flex; gap: 5px; flex-wrap: wrap; }
+.pill-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: 'Inter', sans-serif;
+}
+.pill-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.pill-btn.active {
+  background: rgba(88,166,255,0.12);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+/* Select */
+select.filter-select {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 28px 6px 10px;
+  font-size: 12px; font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238B949E' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color 0.18s;
+}
+select.filter-select:focus { outline: none; border-color: var(--accent-blue); }
+
+/* Range */
+.range-slider-container { position: relative; width: 180px; height: 28px; }
+.range-track {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  height: 4px; width: 100%;
+  background: var(--card-border); border-radius: 4px;
+}
+.range-fill {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+  border-radius: 4px; pointer-events: none;
+}
+input[type="range"] {
+  position: absolute; width: 100%;
+  top: 50%; transform: translateY(-50%);
+  -webkit-appearance: none; appearance: none;
+  background: transparent; pointer-events: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  pointer-events: all; cursor: pointer;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 8px rgba(88,166,255,0.5);
+  transition: transform 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+/* Reset btn */
+.reset-btn {
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 11px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.3px;
+}
+.reset-btn:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+/* Filter count */
+.filter-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(88,166,255,0.15);
+  color: var(--accent-blue);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 10px; font-weight: 700;
+  min-width: 22px;
+  margin-left: 6px;
+}
+
+/* ═══════════════════════════ KPI STRIP ═══════════════════════════ */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+}
+.kpi-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; border-radius: var(--radius) var(--radius) 0 0;
+}
+.kpi-card.blue  { border-color: rgba(88,166,255,0.15); }
+.kpi-card.green { border-color: rgba(86,211,100,0.15); }
+.kpi-card.red   { border-color: rgba(247,129,102,0.15); }
+.kpi-card.gold  { border-color: rgba(227,179,65,0.15); }
+.kpi-card.blue::before  { background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); }
+.kpi-card.green::before { background: linear-gradient(90deg, var(--accent-green), #43A047); }
+.kpi-card.red::before   { background: linear-gradient(90deg, var(--accent-red), #C62828); }
+.kpi-card.gold::before  { background: linear-gradient(90deg, var(--accent-gold), #F57F17); }
+
+.kpi-label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.kpi-value { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -1px; }
+.kpi-card.blue  .kpi-value { color: var(--accent-blue); }
+.kpi-card.green .kpi-value { color: var(--accent-green); }
+.kpi-card.red   .kpi-value { color: var(--accent-red); }
+.kpi-card.gold  .kpi-value { color: var(--accent-gold); }
+.kpi-sub { font-size: 11px; color: var(--text-muted); }
+
+/* Sparkline */
+.sparkline-bars {
+  display: flex; gap: 2px; align-items: flex-end;
+  height: 30px; margin-top: 6px;
+}
+.spark-bar {
+  flex: 1; border-radius: 2px 2px 0 0;
+  background: rgba(88,166,255,0.2);
+  min-height: 4px;
+  transition: height 0.6s ease, background 0.3s;
+}
+.spark-bar.active { background: var(--accent-blue); }
+
+/* Gauge canvas */
+#gauge-canvas { display: block; margin-top: 4px; }
+
+/* Fill bar */
+.fill-bar-track {
+  height: 7px; border-radius: 10px;
+  background: rgba(255,255,255,0.07);
+  overflow: hidden; margin-top: 8px;
+}
+.fill-bar-inner {
+  height: 100%; border-radius: 10px;
+  background: linear-gradient(90deg, #56D364 0%, #F78166 60%, #C62828 100%);
+  transition: width 0.7s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Stars */
+.stars { display: flex; gap: 3px; margin-top: 6px; }
+.star  { font-size: 18px; transition: all 0.4s ease; }
+.star.empty { opacity: 0.15; filter: grayscale(1); }
+
+/* ═══════════════════════════ CHART GRID ═══════════════════════════ */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.chart-card:hover { box-shadow: 0 4px 24px rgba(0,0,0,0.2); border-color: #2d333b; }
+.chart-card.span-2 { grid-column: span 2; }
+.chart-card.span-3 { grid-column: span 3; }
+
+/* Card header */
+.card-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--card-border);
+  cursor: pointer; user-select: none;
+  gap: 8px;
+}
+.card-header:hover { background: rgba(255,255,255,0.02); }
+.card-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.card-icon  { font-size: 16px; flex-shrink: 0; }
+.card-title { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Toggle pill */
+.toggle-pill {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--toggle-on);
+  border: none; border-radius: 20px;
+  padding: 4px 11px;
+  font-size: 10px; font-weight: 800;
+  color: #fff; cursor: pointer;
+  letter-spacing: 0.8px;
+  transition: background 0.25s, transform 0.15s, box-shadow 0.25s;
+  font-family: 'Inter', sans-serif;
+  flex-shrink: 0;
+}
+.toggle-pill:hover { transform: scale(1.05); }
+.toggle-pill[aria-pressed="true"]  { background: var(--toggle-on); box-shadow: 0 0 10px rgba(35,134,54,0.4); }
+.toggle-pill[aria-pressed="false"] { background: var(--toggle-off); box-shadow: none; }
+.pill-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #fff;
+  transition: opacity 0.25s;
+}
+.toggle-pill[aria-pressed="true"]  .pill-dot { opacity: 1; }
+.toggle-pill[aria-pressed="false"] .pill-dot { opacity: 0.4; }
+
+/* Card body collapse */
+.card-body {
+  padding: 16px;
+  max-height: 1200px;
+  overflow: hidden; opacity: 1;
+  transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.22s ease,
+              padding 0.3s ease;
+}
+.card-body.collapsed {
+  max-height: 0; opacity: 0;
+  padding-top: 0; padding-bottom: 0;
+}
+
+/* Chart wrapper */
+.chart-wrapper { position: relative; width: 100%; }
+canvas { max-width: 100%; display: block; }
+
+/* ═══════════════════════════ HEATMAP (Section 6) ═══════════════════════════ */
+.heatmap-wrap { overflow-x: auto; }
+.heatmap-table {
+  border-collapse: separate;
+  border-spacing: 4px;
+  width: 100%;
+}
+.heatmap-table th {
+  font-size: 11px; font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 8px;
+  text-align: center; white-space: nowrap;
+}
+.heatmap-table th.row-lbl { text-align: right; padding-right: 10px; }
+.heatmap-table td {
+  border-radius: 8px;
+  text-align: center;
+  padding: 12px 8px;
+  font-size: 15px; font-weight: 700;
+  color: #fff;
+  cursor: default;
+  position: relative;
+  transition: outline 0.15s, transform 0.18s, box-shadow 0.18s;
+  min-width: 80px;
+}
+.heatmap-table td:hover {
+  outline: 2px solid var(--accent-blue);
+  transform: scale(1.06);
+  box-shadow: 0 4px 16px rgba(88,166,255,0.2);
+  z-index: 3;
+}
+.heatmap-table td .cell-count {
+  display: block; font-size: 9px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+.heatmap-table td.empty-cell { background: rgba(255,255,255,0.03); color: var(--text-muted); font-size: 11px; }
+
+/* ═══════════════════════════ CORRELATION HEATMAP (Section 10) ═══════════════════════════ */
+.corr-table-wrap { overflow-x: auto; padding-bottom: 4px; }
+.corr-table {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.corr-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 9px;
+}
+.corr-table th.col-hdr {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  height: 84px; vertical-align: bottom;
+}
+.corr-table td {
+  width: 50px; height: 42px;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 8.5px; font-weight: 700;
+  color: #fff;
+  vertical-align: middle;
+  cursor: default;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.corr-table td:hover { transform: scale(1.12); box-shadow: 0 2px 10px rgba(0,0,0,0.4); z-index: 2; position: relative; }
+.corr-table td.diag { color: #0D1117; font-size: 9px; }
+
+/* ═══════════════════════════ ANNOTATIONS ═══════════════════════════ */
+.annotation {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 12px; padding: 8px 12px;
+  background: rgba(88,166,255,0.06);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent-blue);
+  font-size: 12px; color: var(--text-muted);
+}
+.annotation.warn    { border-left-color: var(--accent-red);   background: rgba(247,129,102,0.06); }
+.annotation.success { border-left-color: var(--accent-green); background: rgba(86,211,100,0.06); }
+
+/* ═══════════════════════════ CHECK GROUPS ═══════════════════════════ */
+.check-group { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.check-item  {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500;
+  cursor: pointer; user-select: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  transition: background 0.18s, border-color 0.18s;
+}
+.check-item:hover { background: rgba(255,255,255,0.04); }
+.check-item input[type="checkbox"] { display: none; }
+.check-dot {
+  width: 11px; height: 11px;
+  border-radius: 3px; border: 2px solid;
+  transition: background 0.2s;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 7px; color: #0D1117; font-weight: 800;
+}
+.check-item input:checked ~ .check-dot-label { text-decoration: none; }
+.check-item.active-check { border-color: currentColor; background: rgba(255,255,255,0.05); }
+
+/* Sleep scale */
+.sleep-scale {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 10px; padding: 8px 12px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px; border: 1px solid var(--card-border);
+}
+.sleep-scale-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 3px; font-size: 10px; color: var(--text-muted);
+}
+
+/* ═══════════════════════════ FOOTER ═══════════════════════════ */
+.dashboard-footer {
+  max-width: 1400px; margin: 32px auto 0;
+  padding: 20px 24px;
+  border-top: 1px solid var(--card-border);
+  display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  font-size: 11px; color: var(--text-muted);
+}
+.footer-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.footer-chip {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--card-border);
+  border-radius: 6px; padding: 3px 9px; font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════ SCROLLBAR ═══════════════════════════ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #444d56; }
+
+/* ═══════════════════════════ RESPONSIVE ═══════════════════════════ */
+@media (max-width: 1100px) {
+  .chart-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-card.span-3 { grid-column: span 2; }
+}
+@media (max-width: 780px) {
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .chart-grid { grid-template-columns: 1fr; }
+  .chart-card.span-2, .chart-card.span-3 { grid-column: span 1; }
+  h1.dashboard-title { font-size: 16px; }
+  .filter-bar { gap: 12px; }
+  .drop-area { padding: 36px 24px; }
+}
+@media (max-width: 480px) {
+  .kpi-strip { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Ambient particle canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- ══════════ STICKY HEADER ══════════ -->
+<header id="sticky-header">
+  <div class="header-inner">
+    <div class="header-left">
+      <div class="header-logo">📊</div>
+      <div>
+        <h1 class="dashboard-title">Screen Time × Mental Wellness</h1>
+        <div class="header-subtitle">Interactive Visual Analytics Dashboard</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="data-badge" id="data-badge">
+        <span class="badge-dot"></span>
+        <span id="badge-text">400 users loaded</span>
+      </div>
+      <button class="hdr-btn hdr-btn-ghost" id="btn-toggle-all" title="Collapse / expand all cards">
+        ⊟ Collapse All
+      </button>
+      <button class="hdr-btn hdr-btn-primary" onclick="document.getElementById('file-input-header').click()">
+        📂 Load CSV
+      </button>
+      <input type="file" id="file-input-header" accept=".csv" style="display:none">
+    </div>
+  </div>
+</header>
+
+<!-- ══════════ UPLOAD ZONE ══════════ -->
+<div id="upload-zone">
+  <div class="upload-hero">
+    <h2>Visualize Your Data</h2>
+    <p>Upload the ScreenTime_vs_MentalWellness.csv file to instantly generate 11 interactive charts with live filters</p>
+  </div>
+
+  <div class="drop-area" id="drop-area">
+    <span class="drop-icon">📁</span>
+    <div class="drop-title">Drop your CSV here</div>
+    <div class="drop-sub">
+      Supports <strong style="color:var(--accent-blue)">ScreenTime_vs_MentalWellness.csv</strong><br>
+      400 rows · 15 columns · auto-parsed instantly
+    </div>
+    <button class="drop-btn" onclick="document.getElementById('file-input').click()">
+      📂 Browse File
+    </button>
+    <input type="file" id="file-input" accept=".csv">
+    <div class="drop-hint">or drag &amp; drop anywhere in this box</div>
+  </div>
+
+  <div class="feature-chips">
+    <div class="chip"><span class="chip-dot" style="background:#58A6FF"></span> 11 Chart Sections</div>
+    <div class="chip"><span class="chip-dot" style="background:#56D364"></span> Live Filters</div>
+    <div class="chip"><span class="chip-dot" style="background:#E3B341"></span> Correlation Map</div>
+    <div class="chip"><span class="chip-dot" style="background:#D2A8FF"></span> Age Radar</div>
+    <div class="chip"><span class="chip-dot" style="background:#F78166"></span> Collapse Toggles</div>
+  </div>
+
+  <div class="spinner" id="spinner"></div>
+</div>
+
+<!-- ══════════ DASHBOARD ══════════ -->
+<div id="dashboard">
+  <div class="dash-inner">
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">Gender</span>
+        <div class="pill-group" id="gender-filter">
+          <button class="pill-btn active" data-val="All">All</button>
+          <button class="pill-btn" data-val="Female">♀ Female</button>
+          <button class="pill-btn" data-val="Male">♂ Male</button>
+          <button class="pill-btn" data-val="Non-binary/Other">⚧ Non-binary</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Occupation</span>
+        <select id="occ-filter" class="filter-select">
+          <option value="All">All Occupations</option>
+          <option value="Employed">Employed</option>
+          <option value="Student">Student</option>
+          <option value="Self-employed">Self-employed</option>
+          <option value="Retired">Retired</option>
+          <option value="Unemployed">Unemployed</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Work Mode</span>
+        <div class="pill-group" id="mode-filter">
+          <button class="pill-btn active" data-val="All">All</button>
+          <button class="pill-btn" data-val="Remote">🏠 Remote</button>
+          <button class="pill-btn" data-val="In-person">🏢 In-person</button>
+          <button class="pill-btn" data-val="Hybrid">🔀 Hybrid</button>
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Screen Time: <span id="range-display" style="color:var(--accent-blue)">0 – 20 hrs</span></span>
+        <div class="range-slider-container">
+          <div class="range-track"></div>
+          <div class="range-fill" id="range-fill"></div>
+          <input type="range" id="range-min" min="0" max="20" value="0" step="0.5">
+          <input type="range" id="range-max" min="0" max="20" value="20" step="0.5">
+        </div>
+      </div>
+
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end;">
+        <span id="result-count" style="font-size:11px; color:var(--text-muted); white-space:nowrap; padding-bottom:6px;"></span>
+        <button class="reset-btn" onclick="resetFilters()">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- KPI STRIP -->
+    <div class="kpi-strip">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Avg Daily Screen Time</div>
+        <div class="kpi-value" id="kpi-screen">–</div>
+        <div class="kpi-sub" id="kpi-screen-sub">hours per day</div>
+        <div class="sparkline-bars" id="sparkline"></div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Avg Mental Wellness</div>
+        <div class="kpi-value" id="kpi-wellness">–</div>
+        <div class="kpi-sub">out of 100</div>
+        <canvas id="gauge-canvas" width="130" height="64"></canvas>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">Avg Stress Level</div>
+        <div class="kpi-value" id="kpi-stress">–</div>
+        <div class="kpi-sub" id="kpi-stress-sub">out of 10</div>
+        <div class="fill-bar-track"><div class="fill-bar-inner" id="stress-bar" style="width:0%"></div></div>
+      </div>
+      <div class="kpi-card gold">
+        <div class="kpi-label">Avg Sleep Quality</div>
+        <div class="kpi-value" id="kpi-sleep">–</div>
+        <div class="kpi-sub">out of 5 (max in data: 4)</div>
+        <div class="stars" id="stars-display"></div>
+      </div>
+    </div>
+
+    <!-- CHART GRID -->
+    <div class="chart-grid">
+
+      <!-- S1: Scatter — Screen Time vs Wellness -->
+      <div class="chart-card span-2" id="card-1">
+        <div class="card-header" onclick="toggleCard(1)">
+          <div class="card-header-left">
+            <span class="card-icon">🔵</span>
+            <span class="card-title">Screen Time → Mental Wellness</span>
+          </div>
+          <button class="toggle-pill" id="toggle-1" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-1">
+          <div class="chart-wrapper" style="height:320px"><canvas id="chart-1"></canvas></div>
+          <div class="annotation warn">⬇️ Higher daily screen time correlates with lower mental wellness scores</div>
+        </div>
+      </div>
+
+      <!-- S2: Stacked Bar — Work vs Leisure -->
+      <div class="chart-card" id="card-2">
+        <div class="card-header" onclick="toggleCard(2)">
+          <div class="card-header-left">
+            <span class="card-icon">📊</span>
+            <span class="card-title">Work vs Leisure Screen Split</span>
+          </div>
+          <button class="toggle-pill" id="toggle-2" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-2">
+          <div class="chart-wrapper" style="height:320px"><canvas id="chart-2"></canvas></div>
+        </div>
+      </div>
+
+      <!-- S3: Bar — Sleep Quality -->
+      <div class="chart-card" id="card-3">
+        <div class="card-header" onclick="toggleCard(3)">
+          <div class="card-header-left">
+            <span class="card-icon">😴</span>
+            <span class="card-title">Sleep Quality → Wellness</span>
+          </div>
+          <button class="toggle-pill" id="toggle-3" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-3">
+          <div class="chart-wrapper" style="height:260px"><canvas id="chart-3"></canvas></div>
+          <div class="sleep-scale">
+            <div class="sleep-scale-item"><span style="font-size:20px">😞</span><span>1 – Poor</span></div>
+            <div class="sleep-scale-item"><span style="font-size:20px">😕</span><span>2</span></div>
+            <div class="sleep-scale-item"><span style="font-size:20px">😐</span><span>3</span></div>
+            <div class="sleep-scale-item"><span style="font-size:20px">🙂</span><span>4</span></div>
+            <div class="sleep-scale-item"><span style="font-size:20px">😊</span><span>5 – Best</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S4: Area — Stress -->
+      <div class="chart-card" id="card-4">
+        <div class="card-header" onclick="toggleCard(4)">
+          <div class="card-header-left">
+            <span class="card-icon">😰</span>
+            <span class="card-title">Stress Level → Wellness</span>
+          </div>
+          <button class="toggle-pill" id="toggle-4" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-4">
+          <div class="chart-wrapper" style="height:260px"><canvas id="chart-4"></canvas></div>
+          <div class="annotation warn">📉 Wellness drops sharply as stress exceeds 6/10</div>
+        </div>
+      </div>
+
+      <!-- S5: Bubble — Exercise -->
+      <div class="chart-card span-3" id="card-5">
+        <div class="card-header" onclick="toggleCard(5)">
+          <div class="card-header-left">
+            <span class="card-icon">🏃</span>
+            <span class="card-title">Exercise → Wellness  ·  Bubble size = Screen Time</span>
+          </div>
+          <button class="toggle-pill" id="toggle-5" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-5">
+          <div class="chart-wrapper" style="height:340px"><canvas id="chart-5"></canvas></div>
+          <div class="annotation success">🏃 More weekly exercise strongly correlates with higher mental wellness</div>
+        </div>
+      </div>
+
+      <!-- S6: Heatmap — Occupation × Work Mode -->
+      <div class="chart-card" id="card-6">
+        <div class="card-header" onclick="toggleCard(6)">
+          <div class="card-header-left">
+            <span class="card-icon">🗂️</span>
+            <span class="card-title">Occupation × Work Mode Heatmap</span>
+          </div>
+          <button class="toggle-pill" id="toggle-6" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-6">
+          <div class="heatmap-wrap" id="heatmap-6"></div>
+          <div class="annotation" style="margin-top:10px">🌡️ Avg daily screen time (hrs) — darker blue = more screen time</div>
+        </div>
+      </div>
+
+      <!-- S7: Scatter Quadrants — Productivity -->
+      <div class="chart-card span-2" id="card-7">
+        <div class="card-header" onclick="toggleCard(7)">
+          <div class="card-header-left">
+            <span class="card-icon">⚡</span>
+            <span class="card-title">Productivity × Screen Time — Quadrant View</span>
+          </div>
+          <button class="toggle-pill" id="toggle-7" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-7">
+          <div class="chart-wrapper" style="height:340px"><canvas id="chart-7"></canvas></div>
+        </div>
+      </div>
+
+      <!-- S8: Histogram — Wellness by Gender -->
+      <div class="chart-card" id="card-8">
+        <div class="card-header" onclick="toggleCard(8)">
+          <div class="card-header-left">
+            <span class="card-icon">👥</span>
+            <span class="card-title">Wellness Distribution by Gender</span>
+          </div>
+          <button class="toggle-pill" id="toggle-8" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-8">
+          <div class="check-group">
+            <label class="check-item" style="color:#58A6FF" id="lbl-female">
+              <input type="checkbox" id="chk-female" checked onchange="syncCheckStyle('lbl-female','chk-female'); updateChart8()">
+              <span class="check-dot" id="dot-female" style="border-color:#58A6FF; background:#58A6FF; color:#0D1117">✓</span>
+              Female
+            </label>
+            <label class="check-item" style="color:#F78166" id="lbl-male">
+              <input type="checkbox" id="chk-male" checked onchange="syncCheckStyle('lbl-male','chk-male'); updateChart8()">
+              <span class="check-dot" id="dot-male" style="border-color:#F78166; background:#F78166; color:#0D1117">✓</span>
+              Male
+            </label>
+            <label class="check-item" style="color:#E3B341" id="lbl-nb">
+              <input type="checkbox" id="chk-nb" checked onchange="syncCheckStyle('lbl-nb','chk-nb'); updateChart8()">
+              <span class="check-dot" id="dot-nb" style="border-color:#E3B341; background:#E3B341; color:#0D1117">✓</span>
+              Non-binary
+            </label>
+          </div>
+          <div class="chart-wrapper" style="height:270px"><canvas id="chart-8"></canvas></div>
+        </div>
+      </div>
+
+      <!-- S9: Multi-line Area — Social Hours -->
+      <div class="chart-card span-2" id="card-9">
+        <div class="card-header" onclick="toggleCard(9)">
+          <div class="card-header-left">
+            <span class="card-icon">🤝</span>
+            <span class="card-title">Social Hours → Wellness by Work Mode</span>
+          </div>
+          <button class="toggle-pill" id="toggle-9" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-9">
+          <div class="chart-wrapper" style="height:300px"><canvas id="chart-9"></canvas></div>
+          <div class="annotation success">🤝 More social hours → better wellness, most pronounced for Remote workers</div>
+        </div>
+      </div>
+
+      <!-- S10: Full Correlation Heatmap -->
+      <div class="chart-card span-3" id="card-10">
+        <div class="card-header" onclick="toggleCard(10)">
+          <div class="card-header-left">
+            <span class="card-icon">🔗</span>
+            <span class="card-title">Full Correlation Map — All 11 Numeric Variables (Pearson r)</span>
+          </div>
+          <button class="toggle-pill" id="toggle-10" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-10">
+          <div class="corr-table-wrap" id="corr-wrap"></div>
+          <div style="display:flex; gap:14px; margin-top:10px; flex-wrap:wrap;">
+            <div class="annotation" style="flex:1; min-width:180px;">🔵 Blue = Positive correlation (stronger = deeper blue)</div>
+            <div class="annotation warn" style="flex:1; min-width:180px;">🔴 Red = Negative correlation (stronger = deeper red)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S11: Radar — Age Groups -->
+      <div class="chart-card span-3" id="card-11">
+        <div class="card-header" onclick="toggleCard(11)">
+          <div class="card-header-left">
+            <span class="card-icon">🕸️</span>
+            <span class="card-title">Age Group Radar — Normalized Multi-Metric Comparison</span>
+          </div>
+          <button class="toggle-pill" id="toggle-11" aria-pressed="true"><span class="pill-dot"></span>ON</button>
+        </div>
+        <div class="card-body" id="body-11">
+          <div class="check-group" id="age-check">
+            <label class="check-item" style="color:#58A6FF" id="lbl-ag0">
+              <input type="checkbox" class="age-chk" data-idx="0" checked onchange="syncCheckStyle('lbl-ag0',this); updateChart11()">
+              <span class="check-dot" style="border-color:#58A6FF;background:#58A6FF;color:#0D1117">✓</span> Teens (16–19)
+            </label>
+            <label class="check-item" style="color:#F78166" id="lbl-ag1">
+              <input type="checkbox" class="age-chk" data-idx="1" checked onchange="syncCheckStyle('lbl-ag1',this); updateChart11()">
+              <span class="check-dot" style="border-color:#F78166;background:#F78166;color:#0D1117">✓</span> Young Adults (20–29)
+            </label>
+            <label class="check-item" style="color:#56D364" id="lbl-ag2">
+              <input type="checkbox" class="age-chk" data-idx="2" checked onchange="syncCheckStyle('lbl-ag2',this); updateChart11()">
+              <span class="check-dot" style="border-color:#56D364;background:#56D364;color:#0D1117">✓</span> Adults (30–39)
+            </label>
+            <label class="check-item" style="color:#E3B341" id="lbl-ag3">
+              <input type="checkbox" class="age-chk" data-idx="3" checked onchange="syncCheckStyle('lbl-ag3',this); updateChart11()">
+              <span class="check-dot" style="border-color:#E3B341;background:#E3B341;color:#0D1117">✓</span> Mid-age (40–49)
+            </label>
+            <label class="check-item" style="color:#D2A8FF" id="lbl-ag4">
+              <input type="checkbox" class="age-chk" data-idx="4" checked onchange="syncCheckStyle('lbl-ag4',this); updateChart11()">
+              <span class="check-dot" style="border-color:#D2A8FF;background:#D2A8FF;color:#0D1117">✓</span> Seniors (50–60)
+            </label>
+          </div>
+          <div class="chart-wrapper" style="height:440px;max-width:700px;margin:0 auto"><canvas id="chart-11"></canvas></div>
+        </div>
+      </div>
+
+    </div><!-- /chart-grid -->
+
+    <!-- FOOTER -->
+    <div class="dashboard-footer">
+      <span>Screen Time × Mental Wellness Dashboard &nbsp;·&nbsp; <span id="footer-count">–</span> records visualized</span>
+      <div class="footer-chips">
+        <span class="footer-chip">Chart.js 4.4</span>
+        <span class="footer-chip">PapaParse 5.4</span>
+        <span class="footer-chip">Vanilla JS</span>
+        <span class="footer-chip">11 Sections</span>
+        <span class="footer-chip">No server required</span>
+      </div>
+    </div>
+
+  </div><!-- /dash-inner -->
+</div><!-- /dashboard -->
+
+<!-- TOAST -->
+<div id="toast">⚠️ Error</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!--  JAVASCRIPT                                                            -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ─── GLOBALS ────────────────────────────────────────────────────────────────
+let rawData = [], filteredData = [], charts = {};
+
+const COLORS = {
+  blue:   '#58A6FF',
+  red:    '#F78166',
+  green:  '#56D364',
+  gold:   '#E3B341',
+  purple: '#D2A8FF',
+  bg:     '#0D1117',
+  card:   '#161B22',
+  border: '#21262D',
+};
+const GENDERS    = { 'Female': COLORS.blue, 'Male': COLORS.red, 'Non-binary/Other': COLORS.gold };
+const WORK_MODES = { 'Remote': COLORS.blue, 'In-person': COLORS.green, 'Hybrid': COLORS.gold };
+const AGE_COLORS = [COLORS.blue, COLORS.red, COLORS.green, COLORS.gold, COLORS.purple];
+
+const CHART_OPTS = {
+  plugins: {
+    legend: {
+      labels: {
+        color: '#8B949E',
+        font: { family: 'Inter', size: 11 },
+        boxWidth: 10, padding: 14, usePointStyle: true, pointStyleWidth: 10
+      }
+    },
+    tooltip: {
+      backgroundColor: '#21262D',
+      titleColor: '#E6EDF3',
+      bodyColor: '#8B949E',
+      borderColor: '#30363D',
+      borderWidth: 1,
+      cornerRadius: 8,
+      padding: 10,
+      titleFont: { family: 'Inter', size: 12, weight: '600' },
+      bodyFont:  { family: 'Inter', size: 11 },
+    }
+  },
+  scales: {
+    x: {
+      grid:  { color: 'rgba(255,255,255,0.04)', lineWidth: 1 },
+      ticks: { color: '#8B949E', font: { family: 'Inter', size: 10 } },
+      border: { color: 'rgba(255,255,255,0.08)' }
+    },
+    y: {
+      grid:  { color: 'rgba(255,255,255,0.04)', lineWidth: 1 },
+      ticks: { color: '#8B949E', font: { family: 'Inter', size: 10 } },
+      border: { color: 'rgba(255,255,255,0.08)' }
+    }
+  }
+};
+
+let filterState = {
+  genders: new Set(['All']),
+  occupation: 'All',
+  modes: new Set(['All']),
+  minScreen: 0,
+  maxScreen: 20
+};
+let debounceTimer = null;
+let allCollapsed = false;
+
+// ─── AMBIENT PARTICLE BG ────────────────────────────────────────────────────
+(function initBg() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+  const N = 55;
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (let i = 0; i < N; i++) {
+    particles.push({
+      x: Math.random() * 1920,
+      y: Math.random() * 1080,
+      r: Math.random() * 1.5 + 0.3,
+      vx: (Math.random() - 0.5) * 0.18,
+      vy: (Math.random() - 0.5) * 0.18,
+      alpha: Math.random() * 0.5 + 0.1,
+      color: [COLORS.blue, COLORS.purple, COLORS.green][Math.floor(Math.random() * 3)]
+    });
+  }
+
+  function hex(h) {
+    const r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+    return {r,g,b};
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+      const {r,g,b} = hex(p.color);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${p.alpha})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ─── COLLAPSE ALL ────────────────────────────────────────────────────────────
+document.getElementById('btn-toggle-all').addEventListener('click', () => {
+  allCollapsed = !allCollapsed;
+  for (let i = 1; i <= 11; i++) {
+    const body = document.getElementById(`body-${i}`);
+    const btn  = document.getElementById(`toggle-${i}`);
+    if (!body || !btn) continue;
+    body.classList.toggle('collapsed', allCollapsed);
+    btn.setAttribute('aria-pressed', String(!allCollapsed));
+    btn.innerHTML = `<span class="pill-dot"></span>${allCollapsed ? 'OFF' : 'ON'}`;
+  }
+  document.getElementById('btn-toggle-all').textContent = allCollapsed ? '⊞ Expand All' : '⊟ Collapse All';
+});
+
+// ─── FILE UPLOAD ─────────────────────────────────────────────────────────────
+function initFileInputs() {
+  ['file-input', 'file-input-header'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  });
+  const drop = document.getElementById('drop-area');
+  drop.addEventListener('dragover',  e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+}
+
+function handleFile(file) {
+  document.getElementById('spinner').style.display = 'block';
+  Papa.parse(file, {
+    header: true,
+    dynamicTyping: true,
+    skipEmptyLines: true,
+    complete(results) {
+      document.getElementById('spinner').style.display = 'none';
+      if (!results.data?.length) { showToast('⚠️ No data found in CSV'); return; }
+      rawData = results.data.filter(d => d.user_id !== null && d.user_id !== undefined && d.user_id !== '');
+      filteredData = [...rawData];
+      document.getElementById('upload-zone').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('data-badge').classList.add('visible');
+      document.getElementById('badge-text').textContent = `${rawData.length} users loaded`;
+      document.getElementById('footer-count').textContent = rawData.length;
+      updateAll();
+    },
+    error() {
+      document.getElementById('spinner').style.display = 'none';
+      showToast('⚠️ Failed to parse CSV. Check the file format.');
+    }
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4200);
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function initFilters() {
+  // Multi-select pill groups
+  ['gender-filter','mode-filter'].forEach(groupId => {
+    document.getElementById(groupId).querySelectorAll('.pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.val;
+        const key = groupId === 'gender-filter' ? 'genders' : 'modes';
+        if (val === 'All') {
+          filterState[key] = new Set(['All']);
+        } else {
+          filterState[key].delete('All');
+          filterState[key].has(val) ? filterState[key].delete(val) : filterState[key].add(val);
+          if (!filterState[key].size) filterState[key].add('All');
+        }
+        syncPills(groupId, filterState[key]);
+        applyFilters();
+      });
+    });
+  });
+
+  document.getElementById('occ-filter').addEventListener('change', e => {
+    filterState.occupation = e.target.value;
+    applyFilters();
+  });
+
+  const rMin = document.getElementById('range-min');
+  const rMax = document.getElementById('range-max');
+  [rMin, rMax].forEach(r => r.addEventListener('input', () => {
+    let lo = +rMin.value, hi = +rMax.value;
+    if (lo > hi) { if (r === rMin) rMin.value = hi; else rMax.value = lo; }
+    lo = +rMin.value; hi = +rMax.value;
+    filterState.minScreen = lo;
+    filterState.maxScreen = hi;
+    document.getElementById('range-display').textContent = `${lo.toFixed(1)} – ${hi.toFixed(1)} hrs`;
+    updateRangeFill();
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(applyFilters, 160);
+  }));
+  updateRangeFill();
+}
+
+function updateRangeFill() {
+  const lo = +document.getElementById('range-min').value;
+  const hi = +document.getElementById('range-max').value;
+  const f  = document.getElementById('range-fill');
+  f.style.left  = (lo / 20 * 100) + '%';
+  f.style.width = ((hi - lo) / 20 * 100) + '%';
+}
+
+function syncPills(groupId, activeSet) {
+  document.getElementById(groupId).querySelectorAll('.pill-btn').forEach(b =>
+    b.classList.toggle('active', activeSet.has(b.dataset.val))
+  );
+}
+
+function applyFilters() {
+  filteredData = rawData.filter(d => {
+    if (!filterState.genders.has('All') && !filterState.genders.has(d.gender)) return false;
+    if (filterState.occupation !== 'All' && d.occupation !== filterState.occupation) return false;
+    if (!filterState.modes.has('All')   && !filterState.modes.has(d.work_mode))    return false;
+    if (d.screen_time_hours < filterState.minScreen || d.screen_time_hours > filterState.maxScreen) return false;
+    return true;
+  });
+  document.getElementById('result-count').textContent = `${filteredData.length} of ${rawData.length} users`;
+  document.getElementById('footer-count').textContent = filteredData.length;
+  updateAll();
+}
+
+function resetFilters() {
+  filterState = { genders: new Set(['All']), occupation: 'All', modes: new Set(['All']), minScreen: 0, maxScreen: 20 };
+  syncPills('gender-filter', filterState.genders);
+  syncPills('mode-filter',   filterState.modes);
+  document.getElementById('occ-filter').value = 'All';
+  document.getElementById('range-min').value  = 0;
+  document.getElementById('range-max').value  = 20;
+  document.getElementById('range-display').textContent = '0.0 – 20.0 hrs';
+  updateRangeFill();
+  filteredData = [...rawData];
+  document.getElementById('result-count').textContent = '';
+  document.getElementById('footer-count').textContent = rawData.length;
+  updateAll();
+}
+
+// ─── TOGGLE CARDS ────────────────────────────────────────────────────────────
+function toggleCard(n) {
+  const body = document.getElementById(`body-${n}`);
+  const btn  = document.getElementById(`toggle-${n}`);
+  const wasOn = btn.getAttribute('aria-pressed') === 'true';
+  btn.setAttribute('aria-pressed', String(!wasOn));
+  btn.innerHTML = `<span class="pill-dot"></span>${wasOn ? 'OFF' : 'ON'}`;
+  body.classList.toggle('collapsed', wasOn);
+}
+
+// ─── CHECKBOX STYLE SYNC ─────────────────────────────────────────────────────
+function syncCheckStyle(lblId, chkOrEl) {
+  const chk = typeof chkOrEl === 'string' ? document.getElementById(chkOrEl) : chkOrEl;
+  // visual feedback via border — dots are always shown, just opacity changes
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const avg = (arr, k) => !arr.length ? 0 : arr.reduce((s,d) => s + (d[k] || 0), 0) / arr.length;
+const groupBy = (arr, k) => arr.reduce((a,d) => { const v = d[k]; (a[v]||(a[v]=[])).push(d); return a; }, {});
+const destroyChart = id => { if (charts[id]) { charts[id].destroy(); delete charts[id]; } };
+const clamp = (v,lo,hi) => Math.min(Math.max(v,lo),hi);
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+function hexToRgb(hex) {
+  return { r: parseInt(hex.slice(1,3),16), g: parseInt(hex.slice(3,5),16), b: parseInt(hex.slice(5,7),16) };
+}
+function blendHex(c1, c2, t) {
+  const a = hexToRgb(c1), b = hexToRgb(c2);
+  return `rgb(${Math.round(lerp(a.r,b.r,t))},${Math.round(lerp(a.g,b.g,t))},${Math.round(lerp(a.b,b.b,t))})`;
+}
+function linReg(pts) {
+  const n = pts.length; if (!n) return {m:0,b:0};
+  let sumX=0,sumY=0,sumXY=0,sumXX=0;
+  pts.forEach(p => { sumX+=p.x; sumY+=p.y; sumXY+=p.x*p.y; sumXX+=p.x*p.x; });
+  const denom = n*sumXX - sumX*sumX;
+  const m = denom ? (n*sumXY - sumX*sumY)/denom : 0;
+  return { m, b: (sumY - m*sumX)/n };
+}
+function pearson(xs, ys) {
+  const n=xs.length; if (n<2) return 0;
+  const mx=xs.reduce((a,b)=>a+b,0)/n, my=ys.reduce((a,b)=>a+b,0)/n;
+  let num=0,dx2=0,dy2=0;
+  for (let i=0;i<n;i++) { const dx=xs[i]-mx,dy=ys[i]-my; num+=dx*dy; dx2+=dx*dx; dy2+=dy*dy; }
+  const den=Math.sqrt(dx2)*Math.sqrt(dy2);
+  return den ? num/den : 0;
+}
+
+// ─── UPDATE ALL ──────────────────────────────────────────────────────────────
+function updateAll() {
+  updateKPIs();
+  updateChart1();
+  updateChart2();
+  updateChart3();
+  updateChart4();
+  updateChart5();
+  updateChart6();
+  updateChart7();
+  updateChart8();
+  updateChart9();
+  updateChart10();
+  updateChart11();
+}
+
+// ─── KPIs ────────────────────────────────────────────────────────────────────
+function updateKPIs() {
+  const d = filteredData;
+  const avgScreen  = avg(d,'screen_time_hours');
+  const avgWell    = avg(d,'mental_wellness_index_0_100');
+  const avgStress  = avg(d,'stress_level_0_10');
+  const avgSleep   = avg(d,'sleep_quality_1_5');
+
+  document.getElementById('kpi-screen').textContent  = avgScreen.toFixed(1);
+  document.getElementById('kpi-wellness').textContent = avgWell.toFixed(1);
+  document.getElementById('kpi-stress').textContent  = avgStress.toFixed(1);
+  document.getElementById('kpi-sleep').textContent   = avgSleep.toFixed(2);
+
+  // Sparkline — distribute bins of avgScreen
+  const hours = [3,5,7,6,8,9,10,8,7,avgScreen,avgScreen*1.05,avgScreen*0.95];
+  const maxH  = Math.max(...hours);
+  document.getElementById('sparkline').innerHTML = hours.map((h,i) =>
+    `<div class="spark-bar${i===9?' active':''}" style="height:${Math.max(8, Math.round(h/maxH*100))}%"></div>`
+  ).join('');
+
+  // Semi-circular gauge
+  drawGauge(avgWell);
+
+  // Stress bar
+  document.getElementById('stress-bar').style.width = clamp(avgStress/10*100,0,100)+'%';
+
+  // Stars (max in dataset is 4)
+  const maxStar = 5;
+  document.getElementById('stars-display').innerHTML = Array.from({length:maxStar},(_,i) =>
+    `<span class="star${i < Math.round(avgSleep) ? '' : ' empty'}">⭐</span>`
+  ).join('');
+}
+
+function drawGauge(value) {
+  const canvas = document.getElementById('gauge-canvas');
+  const ctx    = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const cx=W/2, cy=H*0.92, r=H*0.78;
+  // background arc
+  ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,2*Math.PI);
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=10; ctx.lineCap='round'; ctx.stroke();
+  // colored arc
+  const pct = clamp(value/100,0,1);
+  const color = value >= 60 ? '#56D364' : value >= 35 ? '#E3B341' : '#F78166';
+  ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,Math.PI + pct*Math.PI);
+  ctx.strokeStyle=color; ctx.lineWidth=10; ctx.lineCap='round'; ctx.stroke();
+  // label
+  ctx.fillStyle=color; ctx.font='bold 12px Inter'; ctx.textAlign='center';
+  ctx.fillText(value.toFixed(0), cx, cy-4);
+  ctx.fillStyle='#8B949E'; ctx.font='9px Inter';
+  ctx.fillText('/100', cx, cy+8);
+}
+
+// ─── CHART 1 — Scatter: Screen Time vs Wellness ──────────────────────────────
+function updateChart1() {
+  destroyChart(1);
+  const gGroups = groupBy(filteredData,'gender');
+  const datasets = Object.entries(GENDERS).map(([g,c]) => ({
+    label: g,
+    data: (gGroups[g]||[]).map(d=>({x:d.screen_time_hours, y:d.mental_wellness_index_0_100, uid:d.user_id})),
+    backgroundColor: c+'88',
+    borderColor: c,
+    borderWidth: 1,
+    pointRadius: 4.5,
+    pointHoverRadius: 8,
+    pointStyle: 'circle',
+  }));
+
+  // Regression line
+  const pts = filteredData.map(d=>({x:d.screen_time_hours,y:d.mental_wellness_index_0_100}));
+  const {m,b} = linReg(pts);
+  datasets.push({
+    label: 'Trend Line',
+    data: [{x:0,y:b},{x:20,y:m*20+b}],
+    type: 'line',
+    borderColor: 'rgba(255,255,255,0.55)',
+    borderDash: [6,4],
+    borderWidth: 2,
+    pointRadius: 0,
+    fill: false,
+    tension: 0,
+  });
+
+  charts[1] = new Chart(document.getElementById('chart-1'), {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: CHART_OPTS.plugins.legend,
+        tooltip: {
+          ...CHART_OPTS.plugins.tooltip,
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.label === 'Trend Line') return 'Trend Line';
+              const p = ctx.raw;
+              return [`👤 ${p.uid||'–'}`, `📱 ${(+p.x).toFixed(1)} hrs/day`, `🧠 Wellness: ${(+p.y).toFixed(1)}`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ...CHART_OPTS.scales.x, min:0, max:20 },
+        y: { ...CHART_OPTS.scales.y, min:0, max:100 }
+      }
+    }
+  });
+}
+
+// ─── CHART 2 — Stacked Bar: Work vs Leisure by Occupation ────────────────────
+function updateChart2() {
+  destroyChart(2);
+  const occs   = ['Employed','Student','Self-employed','Retired','Unemployed'];
+  const groups = groupBy(filteredData,'occupation');
+  charts[2] = new Chart(document.getElementById('chart-2'), {
+    type: 'bar',
+    data: {
+      labels: occs,
+      datasets: [
+        {
+          label: 'Work Screen',
+          data: occs.map(o => avg(groups[o]||[],'work_screen_hours')),
+          backgroundColor: COLORS.blue+'88', borderColor: COLORS.blue, borderWidth: 1, borderRadius: 3
+        },
+        {
+          label: 'Leisure Screen',
+          data: occs.map(o => avg(groups[o]||[],'leisure_screen_hours')),
+          backgroundColor: COLORS.red+'88', borderColor: COLORS.red, borderWidth: 1, borderRadius: 3
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: 'y',
+      animation: { duration: 500 },
+      plugins: {
+        legend: CHART_OPTS.plugins.legend,
+        tooltip: {
+          ...CHART_OPTS.plugins.tooltip,
+          callbacks: { label: ctx => `${ctx.dataset.label}: ${(+ctx.raw).toFixed(2)} hrs` }
+        }
+      },
+      scales: {
+        x: { ...CHART_OPTS.scales.x, stacked: true, min: 0 },
+        y: { ...CHART_OPTS.scales.y, stacked: true }
+      }
+    }
+  });
+}
+
+// ─── CHART 3 — Bar: Sleep Quality vs Wellness ────────────────────────────────
+function updateChart3() {
+  destroyChart(3);
+  const groups = groupBy(filteredData,'sleep_quality_1_5');
+  const labels = [1,2,3,4,5];
+  const data   = labels.map(s => avg(groups[s]||[],'mental_wellness_index_0_100'));
+  const colors = ['#C62828','#EF6C00','#F9A825','#7CB342','#2E7D32'];
+  const barPlugin = {
+    id: 'dataLabels',
+    afterDatasetsDraw(chart) {
+      const {ctx, data} = chart;
+      chart.data.datasets.forEach((ds,i) => {
+        chart.getDatasetMeta(i).data.forEach((bar,j) => {
+          const v = ds.data[j];
+          if (!v) return;
+          ctx.save();
+          ctx.fillStyle = '#E6EDF3';
+          ctx.font = 'bold 11px Inter';
+          ctx.textAlign = 'center';
+          ctx.fillText(v.toFixed(1), bar.x, bar.y - 7);
+          ctx.restore();
+        });
+      });
+    }
+  };
+  charts[3] = new Chart(document.getElementById('chart-3'), {
+    type: 'bar',
+    data: {
+      labels: labels.map(l=>`Quality ${l}`),
+      datasets: [{
+        label: 'Avg Wellness',
+        data,
+        backgroundColor: colors.map(c=>c+'CC'),
+        borderColor: colors,
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: CHART_OPTS.plugins.tooltip,
+      },
+      scales: {
+        x: CHART_OPTS.scales.x,
+        y: { ...CHART_OPTS.scales.y, min: 0, max: 100 }
+      }
+    },
+    plugins: [barPlugin]
+  });
+}
+
+// ─── CHART 4 — Area: Stress vs Wellness ──────────────────────────────────────
+function updateChart4() {
+  destroyChart(4);
+  const bins   = ['0–2','2–4','4–6','6–8','8–10'];
+  const ranges = [[0,2],[2,4],[4,6],[6,8],[8,10.1]];
+  const data   = ranges.map(([lo,hi]) =>
+    avg(filteredData.filter(d=>d.stress_level_0_10>=lo&&d.stress_level_0_10<hi), 'mental_wellness_index_0_100')
+  );
+  const overall = avg(filteredData,'mental_wellness_index_0_100');
+
+  charts[4] = new Chart(document.getElementById('chart-4'), {
+    type: 'line',
+    data: {
+      labels: bins,
+      datasets: [
+        {
+          label: 'Avg Wellness',
+          data,
+          borderColor: COLORS.red,
+          backgroundColor: COLORS.red+'20',
+          fill: true,
+          tension: 0.35,
+          pointBackgroundColor: COLORS.red,
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          pointRadius: 6,
+          pointHoverRadius: 10,
+          borderWidth: 2.5,
+        },
+        {
+          label: `Overall Avg (${overall.toFixed(1)})`,
+          data: Array(bins.length).fill(overall),
+          borderColor: 'rgba(255,255,255,0.3)',
+          borderDash: [6,4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: CHART_OPTS.plugins.legend,
+        tooltip: CHART_OPTS.plugins.tooltip,
+      },
+      scales: {
+        x: CHART_OPTS.scales.x,
+        y: { ...CHART_OPTS.scales.y, min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+// ─── CHART 5 — Bubble: Exercise vs Wellness ──────────────────────────────────
+function updateChart5() {
+  destroyChart(5);
+  const sts  = filteredData.map(d=>d.screen_time_hours);
+  const stMn = Math.min(...sts)||0, stMx = Math.max(...sts)||1;
+  const normR = s => 5 + ((s-stMn)/(stMx-stMn||1))*20;
+
+  const modeGroups = groupBy(filteredData,'work_mode');
+  const datasets   = Object.entries(WORK_MODES).map(([mode,color]) => ({
+    label: mode,
+    data: (modeGroups[mode]||[]).map(d => ({
+      x: d.exercise_minutes_per_week,
+      y: d.mental_wellness_index_0_100,
+      r: normR(d.screen_time_hours),
+      screenTime: d.screen_time_hours,
+      mode: d.work_mode
+    })),
+    backgroundColor: color+'55',
+    borderColor:     color+'CC',
+    borderWidth: 1,
+  }));
+
+  charts[5] = new Chart(document.getElementById('chart-5'), {
+    type: 'bubble',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: CHART_OPTS.plugins.legend,
+        tooltip: {
+          ...CHART_OPTS.plugins.tooltip,
+          callbacks: {
+            label: ctx => {
+              const p = ctx.raw;
+              return [`🏃 Exercise: ${p.x} min/wk`, `🧠 Wellness: ${(+p.y).toFixed(1)}`, `📱 Screen: ${p.screenTime?.toFixed(1)} hrs`, `💼 ${p.mode}`];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ...CHART_OPTS.scales.x, min: 0, max: 400 },
+        y: { ...CHART_OPTS.scales.y, min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+// ─── CHART 6 — HTML Heatmap: Occupation × Work Mode ──────────────────────────
+function updateChart6() {
+  const occs  = ['Employed','Student','Self-employed','Retired','Unemployed'];
+  const modes = ['Remote','In-person','Hybrid'];
+
+  // Gather all values for color scale
+  const cells = {};
+  let vals = [];
+  occs.forEach(o => {
+    cells[o] = {};
+    modes.forEach(m => {
+      const sub = filteredData.filter(d=>d.occupation===o&&d.work_mode===m);
+      const v   = avg(sub,'screen_time_hours');
+      cells[o][m] = { v, n: sub.length };
+      if (sub.length) vals.push(v);
+    });
+  });
+  const vMin = vals.length ? Math.min(...vals) : 0;
+  const vMax = vals.length ? Math.max(...vals) : 1;
+
+  let html = '<table class="heatmap-table"><thead><tr><th class="row-lbl"></th>';
+  modes.forEach(m => html += `<th>${m}</th>`);
+  html += '</tr></thead><tbody>';
+
+  occs.forEach(o => {
+    html += `<tr><th class="row-lbl">${o}</th>`;
+    modes.forEach(m => {
+      const {v, n} = cells[o][m];
+      if (!n) {
+        html += `<td class="empty-cell" title="No data">–<span class="cell-count">0 users</span></td>`;
+      } else {
+        const t  = (v-vMin)/(vMax-vMin||1);
+        const bg = blendHex('#1C2128', COLORS.blue, t);
+        html += `<td style="background:${bg}" title="${o} × ${m}: avg ${v.toFixed(2)} hrs (${n} users)">
+          ${v.toFixed(1)}<span class="cell-count">${n} users</span>
+        </td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('heatmap-6').innerHTML = html;
+}
+
+// ─── CHART 7 — Scatter Quadrants: Productivity vs Screen Time ────────────────
+function updateChart7() {
+  destroyChart(7);
+  const gGroups  = groupBy(filteredData,'gender');
+  const datasets = Object.entries(GENDERS).map(([g,c]) => ({
+    label: g,
+    data: (gGroups[g]||[]).map(d=>({x:d.screen_time_hours, y:d.productivity_0_100, uid:d.user_id})),
+    backgroundColor: c+'88',
+    borderColor: c,
+    borderWidth: 1,
+    pointRadius: 4.5,
+    pointHoverRadius: 8,
+  }));
+
+  const quadPlugin = {
+    id: 'quadrant',
+    beforeDatasetsDraw(chart) {
+      const {ctx, chartArea:{left,right,top,bottom}, scales:{x,y}} = chart;
+      const mx = x.getPixelForValue(10);
+      const my = y.getPixelForValue(50);
+      const quads = [
+        { x1:left, y1:top,    x2:mx,    y2:my,     c:'rgba(86,211,100,0.04)',  label:'🟢 Optimal Zone',         lx:left+14, ly:top+18 },
+        { x1:mx,   y1:top,    x2:right, y2:my,     c:'rgba(88,166,255,0.04)',  label:'🔵 High Screen, Productive', lx:mx+8,  ly:top+18 },
+        { x1:left, y1:my,     x2:mx,    y2:bottom, c:'rgba(227,179,65,0.04)', label:'🟡 Low Engagement',        lx:left+14, ly:bottom-12 },
+        { x1:mx,   y1:my,     x2:right, y2:bottom, c:'rgba(247,129,102,0.05)',label:'🔴 Burnout Risk',          lx:mx+8,  ly:bottom-12 },
+      ];
+      quads.forEach(q => {
+        ctx.fillStyle = q.c;
+        ctx.fillRect(q.x1, q.y1, q.x2-q.x1, q.y2-q.y1);
+        ctx.fillStyle = 'rgba(255,255,255,0.38)';
+        ctx.font = 'bold 10.5px Inter';
+        ctx.textAlign = 'left';
+        ctx.fillText(q.label, q.lx, q.ly);
+      });
+      // dividers
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5,5]);
+      ctx.beginPath(); ctx.moveTo(mx,top);    ctx.lineTo(mx,bottom);    ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(left,my);   ctx.lineTo(right,my);     ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  charts[7] = new Chart(document.getElementById('chart-7'), {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: CHART_OPTS.plugins.legend,
+        tooltip: {
+          ...CHART_OPTS.plugins.tooltip,
+          callbacks: {
+            label: ctx => [`📱 Screen: ${(+ctx.raw.x).toFixed(1)} hrs`, `⚡ Productivity: ${(+ctx.raw.y).toFixed(1)}`]
+          }
+        }
+      },
+      scales: {
+        x: { ...CHART_OPTS.scales.x, min:0, max:20 },
+        y: { ...CHART_OPTS.scales.y, min:0, max:100 }
+      }
+    },
+    plugins: [quadPlugin]
+  });
+}
+
+// ─── CHART 8 — Histogram: Wellness by Gender ─────────────────────────────────
+function updateChart8() {
+  destroyChart(8);
+  const bins    = Array.from({length:10},(_,i)=>`${i*10}–${i*10+10}`);
+  const chkMap  = { 'Female':'chk-female', 'Male':'chk-male', 'Non-binary/Other':'chk-nb' };
+
+  const datasets = Object.entries(GENDERS).map(([g,c]) => {
+    const chk = document.getElementById(chkMap[g]);
+    if (chk && !chk.checked) return null;
+    const sub    = filteredData.filter(d=>d.gender===g);
+    const counts = Array(10).fill(0);
+    sub.forEach(d => { const idx=Math.min(Math.floor(d.mental_wellness_index_0_100/10),9); counts[idx]++; });
+    return {
+      label: g, data: counts,
+      backgroundColor: c+'66',
+      borderColor: c,
+      borderWidth: 1.5,
+      borderRadius: 3,
+    };
+  }).filter(Boolean);
+
+  charts[8] = new Chart(document.getElementById('chart-8'), {
+    type: 'bar',
+    data: { labels: bins, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: CHART_OPTS.plugins.legend,
+        tooltip: CHART_OPTS.plugins.tooltip,
+      },
+      scales: {
+        x: CHART_OPTS.scales.x,
+        y: { ...CHART_OPTS.scales.y, beginAtZero: true }
+      }
+    }
+  });
+}
+
+// ─── CHART 9 — Multi-line Area: Social Hours vs Wellness ─────────────────────
+function updateChart9() {
+  destroyChart(9);
+  const bins   = ['0–5','5–10','10–15','15–20','20+'];
+  const ranges = [[0,5],[5,10],[10,15],[15,20],[20,99]];
+
+  const datasets = Object.entries(WORK_MODES).map(([mode,color]) => {
+    const sub  = filteredData.filter(d=>d.work_mode===mode);
+    const data = ranges.map(([lo,hi]) =>
+      avg(sub.filter(d=>d.social_hours_per_week>=lo&&d.social_hours_per_week<hi), 'mental_wellness_index_0_100')
+    );
+    return {
+      label: mode, data,
+      borderColor: color,
+      backgroundColor: color+'22',
+      fill: true, tension: 0.38,
+      pointBackgroundColor: color,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      pointRadius: 5, pointHoverRadius: 9,
+      borderWidth: 2.5,
+    };
+  });
+
+  charts[9] = new Chart(document.getElementById('chart-9'), {
+    type: 'line',
+    data: { labels: bins, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: CHART_OPTS.plugins.legend,
+        tooltip: CHART_OPTS.plugins.tooltip,
+      },
+      scales: {
+        x: CHART_OPTS.scales.x,
+        y: { ...CHART_OPTS.scales.y, min: 0, max: 100 }
+      }
+    }
+  });
+}
+
+// ─── CHART 10 — Correlation Heatmap ──────────────────────────────────────────
+function updateChart10() {
+  const VARS = [
+    { key:'age',                          label:'Age' },
+    { key:'screen_time_hours',            label:'Screen Time' },
+    { key:'work_screen_hours',            label:'Work Screen' },
+    { key:'leisure_screen_hours',         label:'Leisure Screen' },
+    { key:'sleep_hours',                  label:'Sleep Hrs' },
+    { key:'sleep_quality_1_5',            label:'Sleep Quality' },
+    { key:'stress_level_0_10',            label:'Stress' },
+    { key:'productivity_0_100',           label:'Productivity' },
+    { key:'exercise_minutes_per_week',    label:'Exercise' },
+    { key:'social_hours_per_week',        label:'Social Hrs' },
+    { key:'mental_wellness_index_0_100',  label:'Wellness' },
+  ];
+  const n    = VARS.length;
+  const cols = VARS.map(v => filteredData.map(d => d[v.key] || 0));
+  const matrix = Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?1:pearson(cols[i],cols[j])));
+
+  let html = '<table class="corr-table"><thead><tr><th></th>';
+  VARS.forEach(v => html += `<th class="col-hdr">${v.label}</th>`);
+  html += '</tr></thead><tbody>';
+  VARS.forEach((vRow,i) => {
+    html += `<tr><th style="text-align:right;padding-right:8px;font-size:9.5px;white-space:nowrap;color:var(--text-muted)">${vRow.label}</th>`;
+    VARS.forEach((_,j) => {
+      const r = matrix[i][j];
+      if (i===j) {
+        html += `<td class="diag" style="background:#E6EDF3;font-size:9px">1.00</td>`;
+      } else {
+        const t  = Math.abs(r);
+        const bg = r > 0 ? blendHex('#1C2128', COLORS.blue, t) : blendHex('#1C2128', COLORS.red, t);
+        const sign = r >= 0 ? '+' : '';
+        html += `<td style="background:${bg}" title="${vRow.label} × ${VARS[j].label}: ${sign}${r.toFixed(3)}">${sign}${r.toFixed(2)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('corr-wrap').innerHTML = html;
+}
+
+// ─── CHART 11 — Radar: Age Groups ────────────────────────────────────────────
+const AGE_GROUPS = [
+  { label:'Teens (16–19)',        range:[16,19] },
+  { label:'Young Adults (20–29)', range:[20,29] },
+  { label:'Adults (30–39)',       range:[30,39] },
+  { label:'Mid-age (40–49)',      range:[40,49] },
+  { label:'Seniors (50–60)',      range:[50,60] },
+];
+const RADAR_NORMS = {
+  screen:      { min:0, max:20  },
+  wellness:    { min:0, max:100 },
+  productivity:{ min:0, max:100 },
+  sleep:       { min:1, max:5   },
+  exercise:    { min:0, max:375 },
+};
+const norm = (v,mn,mx) => Math.max(0, Math.min(100, (v-mn)/(mx-mn||1)*100));
+
+function updateChart11() {
+  destroyChart(11);
+  const axes = ['Avg Screen Time','Avg Wellness','Avg Productivity','Avg Sleep Quality','Avg Exercise'];
+
+  const datasets = AGE_GROUPS.map(({label,range},i) => {
+    const chk = document.querySelector(`.age-chk[data-idx="${i}"]`);
+    if (chk && !chk.checked) return null;
+    const sub = filteredData.filter(d=>d.age>=range[0]&&d.age<=range[1]);
+    if (!sub.length) return null;
+    const data = [
+      norm(avg(sub,'screen_time_hours'),           RADAR_NORMS.screen.min,       RADAR_NORMS.screen.max),
+      norm(avg(sub,'mental_wellness_index_0_100'), RADAR_NORMS.wellness.min,     RADAR_NORMS.wellness.max),
+      norm(avg(sub,'productivity_0_100'),          RADAR_NORMS.productivity.min, RADAR_NORMS.productivity.max),
+      norm(avg(sub,'sleep_quality_1_5'),           RADAR_NORMS.sleep.min,        RADAR_NORMS.sleep.max),
+      norm(avg(sub,'exercise_minutes_per_week'),   RADAR_NORMS.exercise.min,     RADAR_NORMS.exercise.max),
+    ];
+    return {
+      label,
+      data,
+      borderColor:       AGE_COLORS[i],
+      backgroundColor:   AGE_COLORS[i]+'30',
+      pointBackgroundColor: AGE_COLORS[i],
+      pointBorderColor:  '#fff',
+      pointBorderWidth:  1.5,
+      borderWidth:       2.2,
+      pointRadius:       4,
+      pointHoverRadius:  7,
+    };
+  }).filter(Boolean);
+
+  charts[11] = new Chart(document.getElementById('chart-11'), {
+    type: 'radar',
+    data: { labels: axes, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { ...CHART_OPTS.plugins.legend, position: 'bottom', align: 'center' },
+        tooltip: CHART_OPTS.plugins.tooltip,
+      },
+      scales: {
+        r: {
+          grid:        { color: 'rgba(255,255,255,0.07)', lineWidth: 1 },
+          angleLines:  { color: 'rgba(255,255,255,0.07)' },
+          pointLabels: { color: '#8B949E', font: { family:'Inter', size:12, weight:'500' } },
+          ticks:       { color:'#8B949E', backdropColor:'transparent', font:{ family:'Inter', size:9 }, stepSize: 25 },
+          min: 0, max: 100
+        }
+      }
+    }
+  });
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initFileInputs();
+  initFilters();
+});
+</script>
+</body>
+</html>

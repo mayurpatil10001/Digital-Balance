@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Balance — Mental Wellness Predictor</title>
+  <meta name="description" content="Estimate your mental wellness score based on screen time, sleep, stress, and lifestyle habits. Educational and statistical — not medical advice." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ── Navigation ─────────────────────────────────────────────── -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <span class="nav-logo" aria-hidden="true">⚖️</span>
+        <span class="nav-title">Digital Balance</span>
+      </div>
+      <div class="nav-badge">Educational Tool · Not Medical Advice</div>
+    </div>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────────── -->
+  <header class="hero" role="banner">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="container hero-content">
+      <div class="hero-pill">✨ AI-Powered Wellness Insight</div>
+      <h1 class="hero-title">How balanced is your<br /><span class="gradient-text">digital life?</span></h1>
+      <p class="hero-subtitle">
+        Enter your daily habits below and receive an instant, data-driven estimate of your
+        mental wellness score — along with personalised tips to improve it.
+      </p>
+      <div class="hero-stats" id="heroStats" aria-live="polite">
+        <div class="stat-chip" id="statModel">
+          <span class="stat-icon">🤖</span>
+          <span class="stat-text">Loading model…</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-icon">📊</span>
+          <span class="stat-text">400 survey participants</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-icon">🔒</span>
+          <span class="stat-text">No data stored</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main content ───────────────────────────────────────────── -->
+  <main class="container main-layout" id="mainContent">
+
+    <!-- ── Form panel ─────────────────────────────────────────── -->
+    <section class="form-panel card" aria-labelledby="formHeading">
+      <div class="panel-header">
+        <h2 id="formHeading" class="panel-title">Your Daily Habits</h2>
+        <p class="panel-subtitle">All fields are required. Your data never leaves this page.</p>
+      </div>
+
+      <form id="wellnessForm" novalidate>
+
+        <!-- Section: Demographics -->
+        <div class="form-section">
+          <h3 class="section-label">
+            <span class="section-icon" aria-hidden="true">👤</span> About You
+          </h3>
+          <div class="form-grid two-col">
+
+            <div class="field-group">
+              <label for="age" class="field-label">Age <span class="field-range">(16 – 100)</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="age" name="age" min="16" max="100" value="28" step="1" class="slider" aria-valuemin="16" aria-valuemax="100" aria-valuenow="28" />
+                <output class="slider-value" for="age" id="age-val">28</output>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="gender" class="field-label">Gender</label>
+              <div class="select-wrap">
+                <select id="gender" name="gender" class="select" aria-required="true">
+                  <option value="">Loading…</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="occupation" class="field-label">Occupation</label>
+              <div class="select-wrap">
+                <select id="occupation" name="occupation" class="select" aria-required="true">
+                  <option value="">Loading…</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="work_mode" class="field-label">Work Mode</label>
+              <div class="select-wrap">
+                <select id="work_mode" name="work_mode" class="select" aria-required="true">
+                  <option value="">Loading…</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Screen Time -->
+        <div class="form-section">
+          <h3 class="section-label">
+            <span class="section-icon" aria-hidden="true">📱</span> Screen Time
+          </h3>
+          <div id="screentimeWarning" class="inline-warning hidden" role="alert" aria-live="polite">
+            ⚠ Work + leisure screen time significantly exceeds total screen time. Please review.
+          </div>
+          <div class="form-grid three-col">
+
+            <div class="field-group">
+              <label for="screen_time_hours" class="field-label">Total Screen Time <span class="field-range">hrs/day</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="screen_time_hours" name="screen_time_hours" min="0" max="24" value="8" step="0.5" class="slider" />
+                <output class="slider-value" for="screen_time_hours" id="screen_time_hours-val">8.0</output>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="work_screen_hours" class="field-label">Work Screen Time <span class="field-range">hrs/day</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="work_screen_hours" name="work_screen_hours" min="0" max="24" value="4" step="0.5" class="slider" />
+                <output class="slider-value" for="work_screen_hours" id="work_screen_hours-val">4.0</output>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="leisure_screen_hours" class="field-label">Leisure Screen Time <span class="field-range">hrs/day</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="leisure_screen_hours" name="leisure_screen_hours" min="0" max="24" value="4" step="0.5" class="slider" />
+                <output class="slider-value" for="leisure_screen_hours" id="leisure_screen_hours-val">4.0</output>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Sleep -->
+        <div class="form-section">
+          <h3 class="section-label">
+            <span class="section-icon" aria-hidden="true">😴</span> Sleep
+          </h3>
+          <div class="form-grid two-col">
+
+            <div class="field-group">
+              <label for="sleep_hours" class="field-label">Sleep Duration <span class="field-range">hrs/night</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="sleep_hours" name="sleep_hours" min="0" max="12" value="7" step="0.5" class="slider" />
+                <output class="slider-value" for="sleep_hours" id="sleep_hours-val">7.0</output>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="sleep_quality_1_5" class="field-label">Sleep Quality</label>
+              <div class="star-rating" role="group" aria-label="Sleep quality 1 to 5">
+                <input type="radio" id="sq1" name="sleep_quality_1_5" value="1" class="sr-only" />
+                <label for="sq1" class="star" title="1 – Very poor" aria-label="1 – Very poor">★</label>
+                <input type="radio" id="sq2" name="sleep_quality_1_5" value="2" class="sr-only" />
+                <label for="sq2" class="star" title="2 – Poor" aria-label="2 – Poor">★</label>
+                <input type="radio" id="sq3" name="sleep_quality_1_5" value="3" class="sr-only" checked />
+                <label for="sq3" class="star" title="3 – Average" aria-label="3 – Average">★</label>
+                <input type="radio" id="sq4" name="sleep_quality_1_5" value="4" class="sr-only" />
+                <label for="sq4" class="star" title="4 – Good" aria-label="4 – Good">★</label>
+                <input type="radio" id="sq5" name="sleep_quality_1_5" value="5" class="sr-only" />
+                <label for="sq5" class="star" title="5 – Excellent" aria-label="5 – Excellent">★</label>
+              </div>
+              <p class="star-hint" id="sleepQualityHint">Average (3/5)</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Wellness Factors -->
+        <div class="form-section">
+          <h3 class="section-label">
+            <span class="section-icon" aria-hidden="true">🧘</span> Wellness Factors
+          </h3>
+          <div class="form-grid two-col">
+
+            <div class="field-group">
+              <label for="stress_level_0_10" class="field-label">Stress Level <span class="field-range">(0 none → 10 severe)</span></label>
+              <div class="slider-wrap stress-slider">
+                <input type="range" id="stress_level_0_10" name="stress_level_0_10" min="0" max="10" value="5" step="0.5" class="slider slider-stress" />
+                <output class="slider-value" for="stress_level_0_10" id="stress_level_0_10-val">5.0</output>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="productivity_0_100" class="field-label">Self-rated Productivity <span class="field-range">(0 – 100)</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="productivity_0_100" name="productivity_0_100" min="0" max="100" value="60" step="1" class="slider" />
+                <output class="slider-value" for="productivity_0_100" id="productivity_0_100-val">60</output>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="exercise_minutes_per_week" class="field-label">Weekly Exercise <span class="field-range">minutes/week</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="exercise_minutes_per_week" name="exercise_minutes_per_week" min="0" max="600" value="120" step="10" class="slider" />
+                <output class="slider-value" for="exercise_minutes_per_week" id="exercise_minutes_per_week-val">120</output>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="social_hours_per_week" class="field-label">Social Time <span class="field-range">hrs/week</span></label>
+              <div class="slider-wrap">
+                <input type="range" id="social_hours_per_week" name="social_hours_per_week" min="0" max="50" value="8" step="0.5" class="slider" />
+                <output class="slider-value" for="social_hours_per_week" id="social_hours_per_week-val">8.0</output>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="form-submit">
+          <button type="submit" id="submitBtn" class="btn-primary" aria-label="Calculate my wellness score">
+            <span class="btn-icon" aria-hidden="true">⚡</span>
+            <span class="btn-text">Calculate My Score</span>
+          </button>
+        </div>
+
+      </form>
+    </section>
+
+    <!-- ── Results panel ───────────────────────────────────────── -->
+    <section class="results-panel" id="resultsPanel" aria-labelledby="resultsHeading" aria-live="polite">
+
+      <!-- Placeholder (shown before first prediction) -->
+      <div class="results-placeholder card" id="resultsPlaceholder">
+        <div class="placeholder-icon" aria-hidden="true">🌿</div>
+        <h2 class="placeholder-title">Your results will appear here</h2>
+        <p class="placeholder-text">Fill in the form on the left and click <strong>Calculate My Score</strong> to see your personalised mental wellness estimate.</p>
+      </div>
+
+      <!-- Loading state -->
+      <div class="results-loading card hidden" id="resultsLoading" role="status" aria-label="Calculating…">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="loading-text">Analysing your habits…</p>
+      </div>
+
+      <!-- Error state -->
+      <div class="results-error card hidden" id="resultsError" role="alert">
+        <div class="error-icon" aria-hidden="true">⚠️</div>
+        <h2 class="error-title">Something went wrong</h2>
+        <p class="error-text" id="errorMessage">Please check your connection and try again.</p>
+        <button class="btn-secondary" id="retryBtn">Try Again</button>
+      </div>
+
+      <!-- Result content -->
+      <div class="results-content hidden" id="resultsContent">
+
+        <!-- Score gauge card -->
+        <div class="card score-card" id="scoreCard">
+          <div class="score-header">
+            <h2 id="resultsHeading" class="score-label">Your Wellness Score</h2>
+            <span class="category-badge" id="categoryBadge">—</span>
+          </div>
+          <div class="gauge-container" aria-label="Wellness score gauge">
+            <svg class="gauge-svg" viewBox="0 0 220 130" aria-hidden="true">
+              <defs>
+                <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%"   stop-color="#f59e0b" />
+                  <stop offset="33%"  stop-color="#84cc16" />
+                  <stop offset="66%"  stop-color="#22c55e" />
+                  <stop offset="100%" stop-color="#0d9488" />
+                </linearGradient>
+              </defs>
+              <!-- Track -->
+              <path class="gauge-track"
+                d="M 20 110 A 90 90 0 0 1 200 110"
+                fill="none" stroke="#e2e8f0" stroke-width="16" stroke-linecap="round" />
+              <!-- Fill -->
+              <path class="gauge-fill" id="gaugeFill"
+                d="M 20 110 A 90 90 0 0 1 200 110"
+                fill="none" stroke="url(#gaugeGrad)" stroke-width="16" stroke-linecap="round"
+                stroke-dasharray="283" stroke-dashoffset="283" />
+              <!-- Score text -->
+              <text x="110" y="100" text-anchor="middle" class="gauge-score-text" id="gaugeScore">—</text>
+              <text x="110" y="120" text-anchor="middle" class="gauge-label-text">out of 100</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Top factors card -->
+        <div class="card factors-card" id="factorsCard">
+          <div class="card-icon" aria-hidden="true">🔍</div>
+          <h3 class="card-title">Why this score?</h3>
+          <p class="card-subtitle">The model's most influential factors for your profile:</p>
+          <ul class="factors-list" id="factorsList" aria-label="Top factors"></ul>
+        </div>
+
+        <!-- Tips card -->
+        <div class="card tips-card" id="tipsCard">
+          <div class="card-icon" aria-hidden="true">💡</div>
+          <h3 class="card-title">Tips for you</h3>
+          <p class="card-subtitle">Personalised, data-informed suggestions:</p>
+          <ul class="tips-list" id="tipsList" aria-label="Personalised tips"></ul>
+        </div>
+
+        <!-- Disclaimer — always visible -->
+        <div class="disclaimer-box" id="disclaimerBox" role="note" aria-label="Important disclaimer">
+          <div class="disclaimer-icon" aria-hidden="true">ℹ️</div>
+          <p class="disclaimer-text" id="disclaimerText">
+            This is an estimated wellness indicator based on a statistical model trained on survey data.
+            It is not a diagnosis and not a substitute for professional mental health advice.
+          </p>
+        </div>
+
+      </div><!-- /results-content -->
+    </section>
+
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container footer-inner">
+      <p class="footer-copy">Digital Balance &copy; 2025 — Educational project. Not a clinical tool.</p>
+      <p class="footer-disclaimer">
+        Always consult a qualified mental health professional for personal advice.
+      </p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

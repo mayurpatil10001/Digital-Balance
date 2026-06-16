@@ -1,0 +1,61 @@
+{
+  "all_models": [
+    {
+      "model": "Linear Regression",
+      "test_r2": 0.9335,
+      "test_mae": 4.0093,
+      "test_rmse": 5.1287,
+      "train_r2": 0.9398,
+      "cv_r2_mean": 0.9314,
+      "cv_r2_std": 0.0122
+    },
+    {
+      "model": "Ridge Regression",
+      "test_r2": 0.9335,
+      "test_mae": 3.9954,
+      "test_rmse": 5.1272,
+      "train_r2": 0.9397,
+      "cv_r2_mean": 0.9318,
+      "cv_r2_std": 0.0119
+    },
+    {
+      "model": "Random Forest",
+      "test_r2": 0.889,
+      "test_mae": 5.2679,
+      "test_rmse": 6.6246,
+      "train_r2": 0.9863,
+      "cv_r2_mean": 0.8966,
+      "cv_r2_std": 0.0043
+    },
+    {
+      "model": "Gradient Boosting",
+      "test_r2": 0.9046,
+      "test_mae": 4.8927,
+      "test_rmse": 6.1431,
+      "train_r2": 0.9834,
+      "cv_r2_mean": 0.9081,
+      "cv_r2_std": 0.0112
+    }
+  ],
+  "best_model": "Ridge Regression",
+  "tuned_test_r2": 0.9327,
+  "tuned_test_mae": 4.0209,
+  "tuned_test_rmse": 5.158,
+  "tuned_train_r2": 0.9393,
+  "category_thresholds": {
+    "poor_below": 3.225,
+    "fair_below": 13.4,
+    "good_below": 30.525,
+    "excellent_above": 30.525
+  },
+  "dataset_stats": {
+    "n_train": 320,
+    "n_test": 80,
+    "target_mean": 20.3268,
+    "target_median": 14.8,
+    "target_std": 20.3768,
+    "target_q25": 3.225,
+    "target_q50": 13.4,
+    "target_q75": 30.525
+  }
+}

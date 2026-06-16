@@ -1,0 +1,20 @@
+{
+  "stress_level_0_10": 10.241979,
+  "sleep_quality_1_5": 5.766351,
+  "productivity_0_100": 5.050539,
+  "gender_Non-binary/Other": 2.72045,
+  "exercise_minutes_per_week": 1.502694,
+  "work_mode_Remote": 0.531023,
+  "occupation_Unemployed": 0.49357,
+  "occupation_Retired": 0.487126,
+  "occupation_Self-employed": 0.425165,
+  "work_screen_hours": 0.349213,
+  "social_hours_per_week": 0.326396,
+  "screen_time_hours": 0.320462,
+  "sleep_hours": 0.269862,
+  "age": 0.223587,
+  "work_mode_In-person": 0.183098,
+  "occupation_Student": 0.122244,
+  "gender_Male": 0.085504,
+  "leisure_screen_hours": 0.064885
+}
